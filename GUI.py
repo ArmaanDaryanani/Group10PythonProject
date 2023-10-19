@@ -72,6 +72,7 @@ def update_map(date_index):
     coords = data[date]
     traces = []
 
+    #connects the dots from the new points in the previous date to the new points in the current data
     for idx in range(1, date_index + 1):
         curr_date = list(data.keys())[idx]
         prev_date = list(data.keys())[idx - 1]
@@ -88,7 +89,7 @@ def update_map(date_index):
         else:
             new_points_prev_date = prev_coords[len(data[list(data.keys())[idx - 2]]):]
 
-        #connect every new point from the previous date to every new point in the current date
+        #connects every new point from the previous date to every new point in the current date
         for prev_lon, prev_lat in new_points_prev_date:
             for lon, lat in new_points_current_date:
                 traces.append(go.Scattergeo(
@@ -98,6 +99,7 @@ def update_map(date_index):
                     line={'color': 'blue', 'width': 1},
                 ))
 
+    #simple drawing of red dots for points
     for lon, lat in coords:
         traces.append(go.Scattergeo(
             lon=[lon],
@@ -106,6 +108,7 @@ def update_map(date_index):
             mode='markers'
         ))
 
+    #layout of the map we are using
     layout = go.Layout(
         geo={
             'projection': {'type': "mercator", 'scale': 1},
@@ -124,5 +127,6 @@ def update_map(date_index):
     )
     return {'data': traces, 'layout': layout}
 
+#driver(can be moved to project driver)
 if __name__ == '__main__':
     app.run_server(debug=False)
