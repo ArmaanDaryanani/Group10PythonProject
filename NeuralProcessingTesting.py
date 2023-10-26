@@ -1,18 +1,36 @@
 """
 * Project 10, ENGR1110
 * Neural Processing Testing File
-* Last Updated 10/24/23
+* Last Updated 10/26/23
 """
 import tensorflow as tf
 import matplotlib.pyplot as plt
 import os
+from datetime import timedelta, datetime
 
-day = 1
-countries_by_deaths_list = [1,2,4,3,5,2,42,4,2,5,3,5,3,4,3,4,3,4,3,4,244,57,457,0,0,0,0,34,3242]
+from CaseProcessing import CaseProcessing
+
+processor = CaseProcessing("total_deaths.txt")
+countries_by_deaths_list = processor.exclude_indexes(processor.get_country_deaths_list_per_date("03","01","2020"))
+
+def get_total_list(days_passed):
+    startdate = "2020-01-03"
+    start_date = datetime.strptime(startdate, '%Y-%m-%d')
+
+    # Add days_passed to the start_date
+    final_date = start_date + timedelta(days=days_passed)
+
+    # Return the year, month, and day of the final date
+    year = final_date.year
+    month = final_date.month
+    day = final_date.day
+
+
 
 def run_network(self):
     my_model = tf.keras.models.Sequential([
-        tf.keras.layers.Input(day, countries_by_deaths_list),
+
+        tf.keras.layers.Input(day, len(countries_by_deaths_list)),
         tf.keras.layers.LSTM(128, return_sequences=True),
         tf.keras.layers.LSTM(64, return_sequences=False),
         tf.keras.layers.Dense(32, activation='relu'),
@@ -23,51 +41,7 @@ def run_network(self):
     """training"""
     my_model.fit()
 
-def get_list(filename, day):
-    with open(filename, 'r') as file:
-        num_lines = 0
-        num_days = 0
-
-        for line in file:
-            if num_lines == 0:
-                num_lines += 1
-                countries_list = []
-                num_countries = 0
-                line_list = line.split(",")
-                for val in line_list:
-                    match val:
-                        case "date":
-                            continue
-                        case "World":
-                            continue
-                        case _:
-                            num_countries+=1
-                            countries_list.append(val)
-
-                print(countries_list)
-                print(num_countries)
-                continue
-            else:
-                num_days += 1
-                num_lines += 1
-                year = line[0:4]
-                month = line[5:7]
-                day = line[8:10]
-
-                death_list = []
-                for val in line.split(","):
-                    if val == "":
-                        death_list.append("0")
-                    else:
-                        death_list.append(val)
-                print(death_list)
 
 
-        print(num_days)
 
 
-def get_list_size(self):
-    return len(self.get_list)
-
-
-get_list("total_deaths.txt", 1)
