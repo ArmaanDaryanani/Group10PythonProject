@@ -29,14 +29,14 @@ def get_total_list(days_passed):
     return processor.exclude_indexes(processor.get_country_deaths_dict(day, month, year)).values()
 
 def run_network():
-    my_model = tf.keras.models.Sequential([
+    my_model = tf.keras.models.Sequential()
 
-        tf.keras.layers.InputLayer(input_shape=(1+len(countries_by_deaths_list,))),
-        tf.keras.layers.Dense(128, return_sequences=True),
-        tf.keras.layers.Dense(64, return_sequences=False),
-        tf.keras.layers.Dense(32, activation='relu'),
-        tf.keras.layers.Dense(1+len(countries_by_deaths_list))
-    ])
+    my_model.add(tf.keras.layers.InputLayer(input_shape=(1+len(countries_by_deaths_list))))
+    my_model.add(tf.keras.layers.Dense(128, return_sequences=True))
+    my_model.add(tf.keras.layers.Dense(64, return_sequences=False))
+    my_model.add(tf.keras.layers.Dense(32, activation='relu'))
+    my_model.add(tf.keras.layers.Dense(1+len(countries_by_deaths_list)))
+
     my_model.compile(optimizer='adam', loss='mse')
 
     """training"""
