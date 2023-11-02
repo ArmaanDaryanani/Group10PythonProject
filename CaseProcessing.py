@@ -54,14 +54,18 @@ class CaseProcessing:
         date_str = "{:04d}-{:02d}-{:02d}".format(int(year), int(month), int(day))
         return output_dict[date_str]
 
-    def exclude_indexes(self, dict):
+    def exclude_indexes(self, dict, list_needed=False):
         excluded_list = ["World", "Africa", "Asia", "Europe", "European Union", "Low income",
                          "Lower middle income", "North America", "Saint Martin (French part)",
                          "South America", "Upper middle income"]
 
         for val in excluded_list:
             dict.pop(val, None)
-        return dict
+
+        if list_needed:
+            return list(dict.values())
+        else:
+            return dict
 
     def get_all_countries(self):
         with open(self.filename, 'r') as file:
