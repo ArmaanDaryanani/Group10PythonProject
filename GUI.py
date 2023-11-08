@@ -10,6 +10,11 @@ from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
 from datetime import timedelta, datetime
 
+import json
+import geopandas as gpd
+
+
+
 from CaseProcessing import CaseProcessing
 
 import pycountry
@@ -22,23 +27,53 @@ def read_data_from_file(filename):
             split_line = line.strip().split("\t")
             country_code, lon, lat, country_name = split_line
             country_data[country_name] = (lat, lon)
+        file.close()
     return country_data
+
+
 
 filename = "countries.txt"
 country_data = read_data_from_file(filename)
+
+with open('countries.geojson') as f:
+    countries_geojson = json.load(f)
+
+gdf = gpd.read_file('countries.geojson')
+
+def color_country(country_name):
+    #lookup landmass
+    with open("countries_by_landmass.txt") as landmass_file:
+        landmass_file.read
+
+    gdf['geometry'] = gdf['geometry'].simplify(tolerance=1)
+    simplified_geojson = json.loads(gdf.to_json())
+
+
+    colored_country = go.Choropleth(
+        geojson=simplified_geojson,
+        locations=[f'{country_name}'],
+        z=[0],  # Dummy data
+        colorscale=[[0, '#1B7E10'], [1, '#1B7E10']],
+        showscale=False,
+        featureidkey="properties.ISO_A3"
+    )
+    return colored_country
+
 
 #function to get latlong
 def latlong(country_name):
     return country_data.get(country_name, (0, 0))  #default
 
+
 def construct_data(deaths_filename):
+    length_of_set = 0
     start_date_str = "2020-01-03"
     end_date_str = "2020-05-09"
 
     start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
     end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
 
-    processor = CaseProcessing(deaths_filename)
+    processor = CaseProcessing(deaths_filename)  # Assuming CaseProcessing is defined elsewhere
 
     current_date = start_date
     data_dict = {}
@@ -49,14 +84,16 @@ def construct_data(deaths_filename):
         year, month, day = current_date.year, current_date.month, current_date.day
         country_deaths = processor.exclude_indexes(processor.get_country_deaths_dict(day, month, year))
 
-        # Get country names with deaths > 0
-        countries_with_deaths = [country for country, deaths in country_deaths.items() if deaths > 0]
 
-        # Get the latlong values for these countries
-        latlong_values = set([latlong(country) for country in countries_with_deaths])
+        latlong_values = set()  # Initialize as an empty set for each day
 
-        # Remove (0, 0) from the list if it's present
-        latlong_values.discard((0, 0))
+        for country, deaths in country_deaths.items():
+            if deaths > 0:
+                # Get the lat-long pair for the country
+                lat_long_pair = latlong(country)
+                if lat_long_pair != (0, 0):
+                    lat, long = lat_long_pair
+                    latlong_values.add((lat, f'{long}{deaths}{len(str(deaths))}'))
 
         date_str = current_date.strftime('%Y-%m-%d')
 
@@ -73,14 +110,51 @@ def construct_data(deaths_filename):
 
         # Move to the next date
         current_date += timedelta(days=1)
+
     print(data_dict)
     return data_dict
-
 
 #data points dict
 data = construct_data("total_deaths.txt")
 
-print(construct_data("total_deaths.txt"))
+"""
+data_without_deaths = {}
+for date, coords_list in data.items():
+    new_coords_list = []
+    for coord in coords_list:
+        lat, long = coord
+        length = len(str(long)) - (int(long[-1]) + 1)
+        new_long = long[0:length]
+        new_coord = (lat, new_long)
+        new_coords_list.append(new_coord)
+    new_coords_list = list(set(new_coords_list))
+
+    data_without_deaths[date] = new_coords_list
+
+def hashable_coords_list(coords_list):
+    #Convert a list of coordinate tuples into a hashable type.
+    return tuple(sorted(coords_list))
+#cleans up and remove duplicate value lists
+coords_seen = {}
+duplicates = set()
+
+for date, coords_list in data_without_deaths.items():
+    # Get a hashable version of the coordinates list
+    coords_hashable = hashable_coords_list(coords_list)
+
+    # If we have seen these coordinates before, mark the date as a duplicate
+    if coords_hashable in coords_seen:
+        duplicates.add(date)
+    else:
+        coords_seen[coords_hashable] = date
+
+# Remove duplicate dates
+for duplicate_date in duplicates:
+    del data_without_deaths[duplicate_date]
+
+print(data_without_deaths)
+"""
+
 
 all_countries = [country.name for country in pycountry.countries]
 
@@ -99,19 +173,28 @@ app.layout = html.Div([
             min=0,
             max=len(data.keys()) - 1,
             value=0,
-            step=1  # Changed from None to 1
+            step=None,
+            marks=None  # Optional: marks for each step
         ),
 
         html.Button('Play', id='play-button'),
         dcc.Interval(
             id='interval-component',
-            interval=1 * 1000,  # in milliseconds; 1*1000 means every second
+            interval=1 * 1000,  # in milliseconds where 1*1000 means every second
             n_intervals=0,  # number of times the interval was activated
             max_intervals=-1,  # -1 means no limit
             disabled=True  # starts as disabled
         )
     ], style={'position': 'fixed', 'bottom': '2%', 'left': '2.5%', 'right': '2.5%'})
 ], style={'backgroundColor': 'white'})  # This line sets the background color of the entire webpage
+
+country_names_list = []
+with open("ISO3.txt", 'r') as file:
+    for line in file:
+        country = line.strip()
+        country_names_list.append(country)
+
+
 
 
 @app.callback(
@@ -122,34 +205,62 @@ app.layout = html.Div([
 def update_map(date_index, current_fig):
     date = list(data.keys())[date_index]
     coords = data[date]
+    new_coords_list = []
     traces = []
+    deaths_by_date = []
+
+    # This loop will process the coordinates and separate the deaths
+    for coord in coords:
+        lat, long_deaths = coord
+        len_deaths = "-" + str(long_deaths[-1])
+        deaths = long_deaths[int(len_deaths)]
+        deaths_by_date.append(deaths)  # Convert to int and store the deaths for the current date
+
+        lat, long = coord
+        length = len(str(long)) - (int(long[-1]) + 1)
+        new_long = long[0:length]
+        new_coord = (lat, new_long)
+        new_coords_list.append(new_coord)
+
+    new_coords_list = list(set(new_coords_list))
 
     center = {'lat': 0, 'lon': 0}
     projection = {'type': "orthographic"}
-    """
-    # If we have a current figure, retrieve its view settings
-    if current_fig and 'layout' in current_fig:
-        center = current_fig['layout']['geo'].get('center', {})
-        projection = current_fig['layout']['geo'].get('projection', {})
-    else:
-        center = {'lat': 0, 'lon': 0}
-        projection = {'type': "orthographic"}
-    """
+
     if date_index > 0:  # Ensure there is a previous date to compare with
+
         prev_date = list(data.keys())[date_index - 1]
         prev_coords = data[prev_date]
+        new_prev_coords = []
+        for coord in prev_coords:
+            lat, long = coord
+            length = len(str(long)) - (int(long[-1]) + 1)
+            new_long = long[0:length]
+            new_coord = (lat, new_long)
+            new_prev_coords.append(new_coord)
+
+        new_prev_coords = list(set(new_prev_coords))
 
         # If the current date_index is beyond the first index, calculate the new points from two days ago.
         if date_index > 1:
             two_days_ago_date = list(data.keys())[date_index - 2]
             two_days_ago_coords = data[two_days_ago_date]
-            new_points_prev_day = set(prev_coords) - set(two_days_ago_coords)
+            new_two_days_ago_coords = []
+            for coord in two_days_ago_coords:
+                lat, long = coord
+                length = len(str(long)) - (int(long[-1]) + 1)
+                new_long = long[0:length]
+                new_coord = (lat, new_long)
+                new_two_days_ago_coords.append(new_coord)
+
+            new_points_prev_day = set(new_prev_coords) - set(new_two_days_ago_coords)
+            #print(new_points_prev_day)
         else:
             # If it's the first index, then all points from the previous day are considered new.
-            new_points_prev_day = set(prev_coords)
+            new_points_prev_day = set(new_prev_coords)
 
         # Calculate new points for the current date
-        new_points = set(coords) - set(prev_coords)
+        new_points = set(new_coords_list) - set(new_prev_coords)
 
         # Draw lines between the new points of the current date and the new points from the previous day
         for lon, lat in new_points:
@@ -160,10 +271,8 @@ def update_map(date_index, current_fig):
                     mode='lines',
                     line={'color': 'blue', 'width': 1},
                 ))
-
-
     # Draw the current points
-    for lon, lat in coords:
+    for lon, lat in new_coords_list:
         traces.append(go.Scattergeo(
             lon=[lon],
             lat=[lat],
@@ -191,6 +300,19 @@ def update_map(date_index, current_fig):
         margin={"t": 0, "b": 0, "l": 0, "r": 0},
         showlegend = False
     )
+
+    "-----------------------------------"
+    index = 0
+    for country in country_names_list:
+        index+=1
+        if index is 50:
+            break
+        else:
+            print(country)
+            traces.append(color_country(country))
+
+    "-----------------------------------"
+
     return {'data': traces, 'layout': layout}
 @app.callback(
     Output('date-slider', 'value'),
