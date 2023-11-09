@@ -40,24 +40,39 @@ with open('countries.geojson') as f:
 
 gdf = gpd.read_file('countries.geojson')
 
-def color_country(country_name):
-    #lookup landmass
-    with open("countries_by_landmass.txt") as landmass_file:
-        landmass_file.read
+def initialize_color_country():
+    country_dict = {}
+    # lookup landmass and add to dictionary (country_ISO3 : country_position (on landmass)
+    country_position = 0
+    country_names = []
+    country_ISO3_dict = {}
+    with open("ISO3_Names.txt") as ISO3_file:
+        for ISO3 in ISO3_file:
+            names = ISO3.strip().split(":")
+            country_ISO3_dict[names[1].strip()] = names[0].strip()
+            country_names.append(names[1].strip())
 
-    gdf['geometry'] = gdf['geometry'].simplify(tolerance=1)
-    simplified_geojson = json.loads(gdf.to_json())
+    with open("countries_by_landmass.txt") as landmass_line:
+        for landmass in landmass_line:
+            landmass_list = landmass.strip().split("\t")
+            for name in country_names:
+                if name == landmass_list[1].strip():
+                    country_dict[country_ISO3_dict[name]] = landmass_list[0]
+    print(country_dict)
+    return country_dict
 
+country_dict = initialize_color_country()
 
-    colored_country = go.Choropleth(
-        geojson=simplified_geojson,
-        locations=[f'{country_name}'],
-        z=[0],  # Dummy data
-        colorscale=[[0, '#1B7E10'], [1, '#1B7E10']],
-        showscale=False,
-        featureidkey="properties.ISO_A3"
-    )
-    return colored_country
+def country_mapping(country_ISO3, country_dict):
+    if country_dict.get(country_ISO3) is None:
+        return 1
+    else:
+        country_position = int(country_dict[country_ISO3])
+        print(f'{country_ISO3}:{country_position}')
+        mapped_value = (1 - ((country_position - 1) / (199))) * (1.27) + 0.03
+        if country_position >50:
+            mapped_value = 0.2
+        return mapped_value
 
 
 #function to get latlong
@@ -116,45 +131,6 @@ def construct_data(deaths_filename):
 
 #data points dict
 data = construct_data("total_deaths.txt")
-
-"""
-data_without_deaths = {}
-for date, coords_list in data.items():
-    new_coords_list = []
-    for coord in coords_list:
-        lat, long = coord
-        length = len(str(long)) - (int(long[-1]) + 1)
-        new_long = long[0:length]
-        new_coord = (lat, new_long)
-        new_coords_list.append(new_coord)
-    new_coords_list = list(set(new_coords_list))
-
-    data_without_deaths[date] = new_coords_list
-
-def hashable_coords_list(coords_list):
-    #Convert a list of coordinate tuples into a hashable type.
-    return tuple(sorted(coords_list))
-#cleans up and remove duplicate value lists
-coords_seen = {}
-duplicates = set()
-
-for date, coords_list in data_without_deaths.items():
-    # Get a hashable version of the coordinates list
-    coords_hashable = hashable_coords_list(coords_list)
-
-    # If we have seen these coordinates before, mark the date as a duplicate
-    if coords_hashable in coords_seen:
-        duplicates.add(date)
-    else:
-        coords_seen[coords_hashable] = date
-
-# Remove duplicate dates
-for duplicate_date in duplicates:
-    del data_without_deaths[duplicate_date]
-
-print(data_without_deaths)
-"""
-
 
 all_countries = [country.name for country in pycountry.countries]
 
@@ -304,12 +280,28 @@ def update_map(date_index, current_fig):
     "-----------------------------------"
     index = 0
     for country in country_names_list:
-        index+=1
-        if index is 50:
+        index += 1
+        if index == 50:  # Correctly use '==' for equality
             break
         else:
             print(country)
-            traces.append(color_country(country))
+            mapped_value = country_mapping(country, country_dict)
+            print(f"Mapped value for {country}: {mapped_value}")
+
+            # Create a copy for the specific country's geometry and simplify that
+            country_geometry = gdf[gdf['ISO_A3'] == country].copy()
+            country_geometry['geometry'] = country_geometry['geometry'].simplify(tolerance=mapped_value)
+            simplified_geojson = json.loads(country_geometry.to_json())
+
+            colored_country = go.Choropleth(
+                geojson=simplified_geojson,
+                locations=[country],
+                z=[0],  # Dummy data
+                colorscale=[[0, '#1B7E10'], [1, '#1B7E10']],
+                showscale=False,
+                featureidkey="properties.ISO_A3"
+            )
+            traces.append(colored_country)
 
     "-----------------------------------"
 
