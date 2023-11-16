@@ -1,7 +1,7 @@
 """
 * Project 10, ENGR1110
 * GUI File
-* Last Updated 10/26/23
+* Last Updated 11/14/23
 """
 import dash
 import dash_core_components as dcc
@@ -10,10 +10,11 @@ from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
 from datetime import timedelta, datetime
 
+import scipy.interpolate
+
 import json
 import geopandas as gpd
-
-
+from scipy.interpolate import interp1d
 
 from CaseProcessing import CaseProcessing
 
@@ -34,6 +35,7 @@ def read_data_from_file(filename):
 
 filename = "countries.txt"
 country_data = read_data_from_file(filename)
+
 
 with open('countries.geojson') as f:
     countries_geojson = json.load(f)
@@ -68,22 +70,20 @@ def country_mapping(country_ISO3, country_dict):
         return 1
     else:
         country_position = int(country_dict[country_ISO3])
-        print(f'{country_ISO3}:{country_position}')
-        mapped_value = (1 - ((country_position - 1) / (199))) * (1.27) + 0.03
+        mapped_value = (1 - ((country_position - 1) / (199))) * (1.27) + 0.5
         if country_position >50:
-            mapped_value = 0.2
+            mapped_value = 0.5
         return mapped_value
 
 
-#function to get latlong
+#function to get latlong from full country name
 def latlong(country_name):
     return country_data.get(country_name, (0, 0))  #default
-
 
 def construct_data(deaths_filename):
     length_of_set = 0
     start_date_str = "2020-01-03"
-    end_date_str = "2020-05-09"
+    end_date_str = "2021-05-09"
 
     start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
     end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
@@ -164,14 +164,58 @@ app.layout = html.Div([
     ], style={'position': 'fixed', 'bottom': '2%', 'left': '2.5%', 'right': '2.5%'})
 ], style={'backgroundColor': 'white'})  # This line sets the background color of the entire webpage
 
+
 country_names_list = []
+country_by_lat = {}
+#country is ISO3
 with open("ISO3.txt", 'r') as file:
     for line in file:
         country = line.strip()
         country_names_list.append(country)
+        full_name = ""
+        with open("ISO3_Names.txt", 'r') as names:
+            for names_line in names:
+                list_of_names = names_line.split(":")
+                if list_of_names[0].strip() == country:
+                    full_name = list_of_names[1].strip()
+        names.close()
+        country_by_lat[latlong(full_name)[0]] = country
 
+def clamp(value, min_value, max_value):
+    return max(min_value, min(value, max_value))
 
+def get_color(deaths, max_deaths):
+    #>200,000
+    if deaths > 200000:
+        high_max_deaths = 1000000
+        #interpolate between dark red and black
+        light_red = (255, 0, 0)
+        black = (0, 0, 0)
+        normalized_high = clamp((deaths - 200000) / high_max_deaths, 0, 1)
+        interpolated_rgb_high = tuple(
+            int(light_red[i] + (black[i] - light_red[i]) * normalized_high) for i in range(3)
+        )
+        return f'rgb{interpolated_rgb_high}'
+    #<100,000
+    if deaths < 100000:
+        dark_green = (35, 79, 30)
+        light_green = (0, 255, 0)
 
+        normalized_light = clamp(deaths / 100000, 0, 1)
+        interpolated_rgb = tuple(
+            int(dark_green[i] + (light_green[i] - dark_green[i]) * normalized_light) for i in range(3)
+        )
+        return f'rgb{interpolated_rgb}'
+
+    else:
+        #100,000-200,000
+        light_green = (0, 255, 0)
+        light_red = (255, 0, 0)
+        normalized = clamp((deaths - 100000) / 100000, 0, 1)
+        interpolated_rgb = tuple(
+            int(light_green[i] + (light_red[i] - light_green[i]) * normalized) for i in range(3)
+        )
+        return f'rgb{interpolated_rgb}'
 
 @app.callback(
     Output('world-map', 'figure'),
@@ -183,78 +227,64 @@ def update_map(date_index, current_fig):
     coords = data[date]
     new_coords_list = []
     traces = []
-    deaths_by_date = []
+    deaths_by_country = {}
 
-    # This loop will process the coordinates and separate the deaths
+    #This loop will process the coordinates and separate the deaths
     for coord in coords:
         lat, long_deaths = coord
-        len_deaths = "-" + str(long_deaths[-1])
-        deaths = long_deaths[int(len_deaths)]
-        deaths_by_date.append(deaths)  # Convert to int and store the deaths for the current date
+        len_deaths = int(str(long_deaths)[-1])
+        deaths_str = str(long_deaths)[-(len_deaths + 1):-1]
+        deaths = int(deaths_str)
+
 
         lat, long = coord
         length = len(str(long)) - (int(long[-1]) + 1)
         new_long = long[0:length]
         new_coord = (lat, new_long)
         new_coords_list.append(new_coord)
+        print(long_deaths, deaths)
 
-    new_coords_list = list(set(new_coords_list))
+        for lat_country, country in country_by_lat.items():
+            if lat_country == lat:
+                deaths_by_country[country] = deaths
+
+
+
+    "-----------------------------------"
+    index = 0
+    max_deaths = 200000
+    for country in country_names_list:
+        index += 1
+        if index == 249:
+            break
+        else:
+            print(country)
+            mapped_value = country_mapping(country, country_dict)
+            rounded_mapped_val = round(mapped_value, 2)
+            #print(deaths_by_country)
+            deaths = deaths_by_country.get(country, 0)
+            color = get_color(int(deaths), max_deaths)
+
+            #create a copy for the specific country's geometry and simplify that
+            country_geometry = gdf[gdf['ISO_A3'] == country].copy()
+            country_geometry['geometry'] = country_geometry['geometry'].simplify(tolerance=rounded_mapped_val)
+            simplified_geojson = json.loads(country_geometry.to_json())
+
+            colored_country = go.Choropleth(
+                geojson=simplified_geojson,
+                locations=[country],
+                z=[int(deaths)],
+                colorscale=[[0, color], [1, color]],
+
+                showscale=False,
+                featureidkey="properties.ISO_A3"
+            )
+            traces.append(colored_country)
+    "-----------------------------------"
+
 
     center = {'lat': 0, 'lon': 0}
     projection = {'type': "orthographic"}
-
-    if date_index > 0:  # Ensure there is a previous date to compare with
-
-        prev_date = list(data.keys())[date_index - 1]
-        prev_coords = data[prev_date]
-        new_prev_coords = []
-        for coord in prev_coords:
-            lat, long = coord
-            length = len(str(long)) - (int(long[-1]) + 1)
-            new_long = long[0:length]
-            new_coord = (lat, new_long)
-            new_prev_coords.append(new_coord)
-
-        new_prev_coords = list(set(new_prev_coords))
-
-        # If the current date_index is beyond the first index, calculate the new points from two days ago.
-        if date_index > 1:
-            two_days_ago_date = list(data.keys())[date_index - 2]
-            two_days_ago_coords = data[two_days_ago_date]
-            new_two_days_ago_coords = []
-            for coord in two_days_ago_coords:
-                lat, long = coord
-                length = len(str(long)) - (int(long[-1]) + 1)
-                new_long = long[0:length]
-                new_coord = (lat, new_long)
-                new_two_days_ago_coords.append(new_coord)
-
-            new_points_prev_day = set(new_prev_coords) - set(new_two_days_ago_coords)
-            #print(new_points_prev_day)
-        else:
-            # If it's the first index, then all points from the previous day are considered new.
-            new_points_prev_day = set(new_prev_coords)
-
-        # Calculate new points for the current date
-        new_points = set(new_coords_list) - set(new_prev_coords)
-
-        # Draw lines between the new points of the current date and the new points from the previous day
-        for lon, lat in new_points:
-            for prev_lon, prev_lat in new_points_prev_day:
-                traces.append(go.Scattergeo(
-                    lon=[prev_lon, lon],
-                    lat=[prev_lat, lat],
-                    mode='lines',
-                    line={'color': 'blue', 'width': 1},
-                ))
-    # Draw the current points
-    for lon, lat in new_coords_list:
-        traces.append(go.Scattergeo(
-            lon=[lon],
-            lat=[lat],
-            marker={'color': 'red', 'size': 10},
-            mode='markers'
-        ))
 
     # Layout of the map we are using
     layout = go.Layout(
@@ -265,7 +295,7 @@ def update_map(date_index, current_fig):
             'landcolor': '#234F1E',
             'showocean': True,
             'oceancolor': '#006994',
-            'showcountries': True,
+            'showcountries': False,
             'countrycolor': 'black',
             'countrywidth': 0.5,
             'showframe': False,
@@ -276,34 +306,6 @@ def update_map(date_index, current_fig):
         margin={"t": 0, "b": 0, "l": 0, "r": 0},
         showlegend = False
     )
-
-    "-----------------------------------"
-    index = 0
-    for country in country_names_list:
-        index += 1
-        if index == 50:  # Correctly use '==' for equality
-            break
-        else:
-            print(country)
-            mapped_value = country_mapping(country, country_dict)
-            print(f"Mapped value for {country}: {mapped_value}")
-
-            # Create a copy for the specific country's geometry and simplify that
-            country_geometry = gdf[gdf['ISO_A3'] == country].copy()
-            country_geometry['geometry'] = country_geometry['geometry'].simplify(tolerance=mapped_value)
-            simplified_geojson = json.loads(country_geometry.to_json())
-
-            colored_country = go.Choropleth(
-                geojson=simplified_geojson,
-                locations=[country],
-                z=[0],  # Dummy data
-                colorscale=[[0, '#1B7E10'], [1, '#1B7E10']],
-                showscale=False,
-                featureidkey="properties.ISO_A3"
-            )
-            traces.append(colored_country)
-
-    "-----------------------------------"
 
     return {'data': traces, 'layout': layout}
 @app.callback(
