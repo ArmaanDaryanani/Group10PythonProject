@@ -1,8 +1,15 @@
 """
 * Project 10, ENGR1110
 * GUI File
-* Last Updated 11/14/23
+* Last Updated 11/16/23
 """
+
+"""TO DO"""
+# Add toggleable button to change between mercator and orthographic projections
+# Add sidebar that ranks list of countries that will have the most deaths the next day
+# Sidebar should be toggleable
+
+
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -10,11 +17,10 @@ from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
 from datetime import timedelta, datetime
 
-import scipy.interpolate
+from multiprocessing import Pool
 
 import json
 import geopandas as gpd
-from scipy.interpolate import interp1d
 
 from CaseProcessing import CaseProcessing
 
@@ -65,17 +71,6 @@ def initialize_color_country():
 
 country_dict = initialize_color_country()
 
-def country_mapping(country_ISO3, country_dict):
-    if country_dict.get(country_ISO3) is None:
-        return 1
-    else:
-        country_position = int(country_dict[country_ISO3])
-        mapped_value = (1 - ((country_position - 1) / (199))) * (1.27) + 0.5
-        if country_position >50:
-            mapped_value = 0.5
-        return mapped_value
-
-
 #function to get latlong from full country name
 def latlong(country_name):
     return country_data.get(country_name, (0, 0))  #default
@@ -83,7 +78,7 @@ def latlong(country_name):
 def construct_data(deaths_filename):
     length_of_set = 0
     start_date_str = "2020-01-03"
-    end_date_str = "2021-05-09"
+    end_date_str = "2022-05-09"
 
     start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
     end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
@@ -156,7 +151,7 @@ app.layout = html.Div([
         html.Button('Play', id='play-button'),
         dcc.Interval(
             id='interval-component',
-            interval=1 * 1000,  # in milliseconds where 1*1000 means every second
+            interval=3 * 1000,  # in milliseconds where 1*1000 means every second
             n_intervals=0,  # number of times the interval was activated
             max_intervals=-1,  # -1 means no limit
             disabled=True  # starts as disabled
@@ -248,8 +243,6 @@ def update_map(date_index, current_fig):
             if lat_country == lat:
                 deaths_by_country[country] = deaths
 
-
-
     "-----------------------------------"
     index = 0
     max_deaths = 200000
@@ -259,7 +252,7 @@ def update_map(date_index, current_fig):
             break
         else:
             print(country)
-            mapped_value = country_mapping(country, country_dict)
+            mapped_value = 0.3
             rounded_mapped_val = round(mapped_value, 2)
             #print(deaths_by_country)
             deaths = deaths_by_country.get(country, 0)
@@ -275,16 +268,15 @@ def update_map(date_index, current_fig):
                 locations=[country],
                 z=[int(deaths)],
                 colorscale=[[0, color], [1, color]],
-
+                hoverinfo="location+z",
                 showscale=False,
                 featureidkey="properties.ISO_A3"
             )
             traces.append(colored_country)
     "-----------------------------------"
 
-
     center = {'lat': 0, 'lon': 0}
-    projection = {'type': "orthographic"}
+    projection = {'type': "mercator"}
 
     # Layout of the map we are using
     layout = go.Layout(
