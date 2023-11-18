@@ -1,13 +1,13 @@
 """
 * Project 10, ENGR1110
 * GUI File
-* Last Updated 11/16/23
+* Last Updated 11/18/23
 """
 
-"""TO DO"""
 # Add toggleable button to change between mercator and orthographic projections
 # Add sidebar that ranks list of countries that will have the most deaths the next day
 # Sidebar should be toggleable
+# optimization
 
 
 import dash
@@ -78,7 +78,7 @@ def latlong(country_name):
 def construct_data(deaths_filename):
     length_of_set = 0
     start_date_str = "2020-01-03"
-    end_date_str = "2022-05-09"
+    end_date_str = "2020-05-09"
 
     start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
     end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
@@ -147,8 +147,8 @@ app.layout = html.Div([
             step=None,
             marks=None  # Optional: marks for each step
         ),
-
         html.Button('Play', id='play-button'),
+        html.Button('Toggle Projection', id='toggle-projection-button'),
         dcc.Interval(
             id='interval-component',
             interval=3 * 1000,  # in milliseconds where 1*1000 means every second
@@ -214,15 +214,20 @@ def get_color(deaths, max_deaths):
 
 @app.callback(
     Output('world-map', 'figure'),
-    [Input('date-slider', 'value')],
+    [Input('date-slider', 'value'), Input('toggle-projection-button', 'n_clicks')],
     [State('world-map', 'figure')]
 )
-def update_map(date_index, current_fig):
+def update_map(date_index, toggle_clicks, current_fig):
     date = list(data.keys())[date_index]
     coords = data[date]
     new_coords_list = []
     traces = []
     deaths_by_country = {}
+
+    if toggle_clicks is None:
+        toggle_clicks = 0
+
+    projection_type = "orthographic" if toggle_clicks % 2 != 0 else "mercator"
 
     #This loop will process the coordinates and separate the deaths
     for coord in coords:
@@ -276,12 +281,12 @@ def update_map(date_index, current_fig):
     "-----------------------------------"
 
     center = {'lat': 0, 'lon': 0}
-    projection = {'type': "mercator"}
+
 
     # Layout of the map we are using
     layout = go.Layout(
         geo={
-            'projection': projection,
+            'projection': {'type': projection_type},
             'center': center,
             'showland': True,
             'landcolor': '#234F1E',
@@ -325,6 +330,8 @@ def toggle_play(n_clicks, currently_disabled):
         return False, "Pause"
     else:
         return True, "Play"
+
+
 #driver(can be moved to project driver)
 if __name__ == '__main__':
     app.run_server(debug=False)
