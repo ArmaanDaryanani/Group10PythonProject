@@ -1,10 +1,9 @@
 """
 * Project 10, ENGR1110
 * GUI File
-* Last Updated 11/18/23
+* Last Updated 11/19/23
 """
 
-# Add toggleable button to change between mercator and orthographic projections
 # Add sidebar that ranks list of countries that will have the most deaths the next day
 # Sidebar should be toggleable
 # optimization
@@ -78,7 +77,7 @@ def latlong(country_name):
 def construct_data(deaths_filename):
     length_of_set = 0
     start_date_str = "2020-01-03"
-    end_date_str = "2020-05-09"
+    end_date_str = "2022-05-09"
 
     start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
     end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
