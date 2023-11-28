@@ -1,7 +1,7 @@
 """
 * Project 10, ENGR1110
 * GUI File
-* Last Updated 11/19/23
+* Last Updated 11/27/23
 """
 
 # Add sidebar that ranks list of countries that will have the most deaths the next day
@@ -16,7 +16,10 @@ from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
 from datetime import timedelta, datetime
 
-from multiprocessing import Pool
+from dash.exceptions import PreventUpdate
+
+from NeuralProcessingTesting import NeuralProcessingTesting
+import tensorflow as tf
 
 import json
 import geopandas as gpd
@@ -77,7 +80,7 @@ def latlong(country_name):
 def construct_data(deaths_filename):
     length_of_set = 0
     start_date_str = "2020-01-03"
-    end_date_str = "2022-05-09"
+    end_date_str = "2020-05-09"
 
     start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
     end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
@@ -133,10 +136,26 @@ app = dash.Dash(__name__)
 app.layout = html.Div([
     dcc.Graph(
         id='world-map',
-        style={'height': '90vh', 'width': '95vw', 'margin': 'auto'}
+        config={'displayModeBar': False},
+        style={
+            'height': '85vh',
+            'width': '89vw',
+            'margin': 'auto',
+            'marginTop': '30px',
+            'marginLeft': '176px'
+
+        }
     ),
     html.Div(id='globe-rotation', style={'display': 'none'}, children="{'lon': 0, 'lat': 0}"),
 
+    # Predict button and output on top left
+    html.Div([
+        html.Button('Predict', id='predict-button-top'),
+        html.Div(id='prediction-output', style={'fontSize': '12.6px'})
+    ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'flex-start', 'top': '0px', 'left': '10px',
+              'position': 'absolute'}),
+
+    # Other controls at bottom
     html.Div([
         dcc.Slider(
             id='date-slider',
@@ -148,6 +167,7 @@ app.layout = html.Div([
         ),
         html.Button('Play', id='play-button'),
         html.Button('Toggle Projection', id='toggle-projection-button'),
+
         dcc.Interval(
             id='interval-component',
             interval=3 * 1000,  # in milliseconds where 1*1000 means every second
@@ -156,8 +176,7 @@ app.layout = html.Div([
             disabled=True  # starts as disabled
         )
     ], style={'position': 'fixed', 'bottom': '2%', 'left': '2.5%', 'right': '2.5%'})
-], style={'backgroundColor': 'white'})  # This line sets the background color of the entire webpage
-
+], style={'backgroundColor': 'white', 'position': 'relative'})
 
 country_names_list = []
 country_by_lat = {}
@@ -314,6 +333,34 @@ def update_slider(n, current_value):
         return current_value + 1
     else:
         return current_value
+
+@app.callback(
+    Output('prediction-output', 'children'),
+    [Input('predict-button-top', 'n_clicks')],
+    [State('date-slider', 'value')],
+    prevent_initial_call=True
+)
+def update_predictions(n_clicks, slider_value):
+    if n_clicks is None:
+        raise PreventUpdate
+
+    # Use the slider value to represent the days passed since the initial date
+    days_passed = slider_value
+
+    # Initialize the NeuralProcessingTesting instance and predict
+    neural_processor = NeuralProcessingTesting()
+    top_5_predicted = neural_processor.predict_next(days_passed)
+
+    # Check if the result is not None and is iterable
+    if top_5_predicted and isinstance(top_5_predicted, list):
+        # Create a list of Dash HTML components for displaying the predictions
+        predictions_list = [html.Li(f"{country}: {deaths}") for country, deaths in top_5_predicted]
+    else:
+        predictions_list = [html.Li("No predictions available")]
+
+    # Return the formatted list
+    return html.Ol(predictions_list)
+
 
 @app.callback(
     [Output('interval-component', 'disabled'),
