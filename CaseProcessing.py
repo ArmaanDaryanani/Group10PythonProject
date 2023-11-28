@@ -1,9 +1,8 @@
 """
-* Project 10, ENGR1110
-* GUI File
-* Last Updated 11/14/23
+* Group 10, ENGR1110
+* Case Processing File
+* Last Updated 11/27/23
 """
-
 
 from datetime import datetime, timedelta
 
@@ -80,8 +79,6 @@ class CaseProcessing:
 
         country_deaths_dict = dict(zip(country_list, deaths_list))
         return country_deaths_dict
-
-
 
 
 if __name__ == "__main__":
