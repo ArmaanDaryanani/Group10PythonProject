@@ -43,11 +43,11 @@ TCD: Chad
 CHL: Chile
 CHN: China
 CXR: Christmas Island
-CCK: Cocos (Keeling) Islands
+CCK: Cocos
 COL: Colombia
 COM: Comoros
 COG: Congo
-COD: Congo (Democratic Republic of the)
+COD: Congo
 COK: Cook Islands
 CRI: Costa Rica
 CIV: Côte d'Ivoire
@@ -67,7 +67,7 @@ GNQ: Equatorial Guinea
 ERI: Eritrea
 EST: Estonia
 ETH: Ethiopia
-FLK: Falkland Islands (Malvinas)
+FLK: Falkland Islands
 FRO: Faroe Islands
 FJI: Fiji
 FIN: Finland
@@ -100,7 +100,7 @@ HUN: Hungary
 ISL: Iceland
 IND: India
 IDN: Indonesia
-IRN: Iran (Islamic Republic of)
+IRN: Iran
 IRQ: Iraq
 IRL: Ireland
 IMN: Isle of Man
@@ -113,12 +113,12 @@ JOR: Jordan
 KAZ: Kazakhstan
 KEN: Kenya
 KIR: Kiribati
-PRK: Korea (Democratic People's Republic of)
-KOR: Korea (Republic of)
+PRK: North Korea
+KOR: South Korea
 XKX: Kosovo
 KWT: Kuwait
 KGZ: Kyrgyzstan
-LAO: Lao People's Democratic Republic
+LAO: Laos
 LVA: Latvia
 LBN: Lebanon
 LSO: Lesotho
@@ -141,8 +141,8 @@ MRT: Mauritania
 MUS: Mauritius
 MYT: Mayotte
 MEX: Mexico
-FSM: Micronesia (Federated States of)
-MDA: Moldova (Republic of)
+FSM: Micronesia
+MDA: Moldova
 MCO: Monaco
 MNG: Mongolia
 MNE: Montenegro
@@ -180,13 +180,13 @@ QAT: Qatar
 SRB: Serbia
 REU: Réunion
 ROU: Romania
-RUS: Russian Federation
+RUS: Russia
 RWA: Rwanda
 BLM: Saint Barthélemy
 SHN: Saint Helena, Ascension and Tristan da Cunha
 KNA: Saint Kitts and Nevis
 LCA: Saint Lucia
-MAF: Saint Martin (French part)
+MAF: Saint Martin
 SPM: Saint Pierre and Miquelon
 VCT: Saint Vincent and the Grenadines
 WSM: Samoa
@@ -204,7 +204,7 @@ SLB: Solomon Islands
 SOM: Somalia
 ZAF: South Africa
 SGS: South Georgia and the South Sandwich Islands
-SSD: South Sudan
+SSD: Sudan
 ESP: Spain
 LKA: Sri Lanka
 SDN: Sudan
@@ -213,10 +213,10 @@ SJM: Svalbard and Jan Mayen
 SWZ: Eswatini
 SWE: Sweden
 CHE: Switzerland
-SYR: Syrian Arab Republic
-TWN: Taiwan (Province of China)
+SYR: Syria
+TWN: Taiwan
 TJK: Tajikistan
-TZA: Tanzania, United Republic of
+TZA: Tanzania
 THA: Thailand
 TLS: Timor-Leste
 TGO: Togo
@@ -232,16 +232,15 @@ TUV: Tuvalu
 UGA: Uganda
 UKR: Ukraine
 ARE: United Arab Emirates
-GBR: United Kingdom of Great Britain and Northern Ireland
-USA: United States of America
+GBR: United Kingdom
+USA: United States
 UMI: United States Minor Outlying Islands
 URY: Uruguay
 UZB: Uzbekistan
 VUT: Vanuatu
-VEN: Venezuela (Bolivarian Republic of)
+VEN: Venezuela
 VNM: Vietnam
-VGB: Virgin Islands (British)
-VIR: Virgin Islands (U.S.)
+VGB: Virgin Islands
 WLF: Wallis and Futuna
 ESH: Western Sahara
 YEM: Yemen
