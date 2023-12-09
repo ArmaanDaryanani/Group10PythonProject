@@ -1,82 +1,122 @@
-"""
-* Project 10, ENGR1110
-* Neural Processing File
-* Last Updated 10/31/23
-"""
 import tensorflow as tf
-import matplotlib.pyplot as plt
+import numpy as np
+from datetime import timedelta, datetime
 
-#get data and splits it into training and testing datasets
-#The first section trains the NN on data its seen before, and the 2nd section trains it on data it hasnt seen before
-(train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.mnist.load_data()
-
-#scales down pixel values from 0-255 to 0-1 so our NN can parse it easily
-train_images = train_images / 255.0
-test_images = test_images / 255.0
-
-#visualizes the data
-print(train_images.shape)
-print(test_images.shape)
-print(train_labels)
-
-#display the first image
-plt.imshow(train_images[0], cmap='gray')
-plt.show()
-#if you observe the output, you will see something like this for the first one:
-#training set: (60000, 28, 28), 60000 images total (has seen), 28x28 pixels
-#testing set: (10000, 28, 28), 10000 images total (never seen), 28x28 pixels
-
-#defines the neural netowrk model
-#using the easiest neural network model by stacking neural network layers on top of eachother (sequential)
-my_model = tf.keras.models.Sequential()
-
-
-#flattens the 28x28 layer of pixels into a single line of pixels so we can feed them to the neural network in the most simple way possible (1 line at a time)
-my_model.add(tf.keras.layers.Flatten(input_shape=(28,28))) #adds layers sequentially
-
-
-#dense layer which receives input from all the neurons of the previous layer (dense)
-#smaller networks use less memory and run faster
-#activation: decides whether a neuron should be activated or not. Outputs a small value for small inputs and larger values of inputs exceed a threshold
-#relu activation is one of the most computationally effective activation functions
-#128 is the number of neurons
-my_model.add(tf.keras.layers.Dense(128, activation='relu'))
-
-
-#10 is the number of neurons, should match the number of classifications we have (0-9, so 10)
-#multiclass classifications, so softmax function is used, which turns values into probabilistic range we can interpret (ex: outputs 0.70 (70%) if it thinks an image is a "5" or something)
-my_model.add(tf.keras.layers.Dense(10, activation='softmax'))
-
-
-#compile the model and optimizes it using the adam optimizer (common)
-#multiclass classification, so loss= sparse_categorical_crossentropy
-#you can experiment each for performance
-#metrics we want to track: accuracy of this model (for testing/debug)
-my_model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-
-
-#once we create and compile the neural network, lets feed it with our own data and what they should be
-#we are training it 3 times, (3*60000)
-#if we have epochs too high, it might be prone to overfitting, where the NN starts to memorize parts of the images (not generalizable and bad)
-my_model.fit(train_images, train_labels, epochs=3)
-
-
-#lets see how well it does with 10000 of unseen data
-#takes a guess on whats it thinks is the number
-val_loss, val_acc = my_model.evaluate(test_images, test_labels)
-print('Test accuracy: ', val_acc)
-#if there is a large difference between training accuracy and testing accuracy (ex: 70% training, 97% testing) it could be a sign of overfitting
+import joblib
+from CaseProcessing import CaseProcessing
 
 
 
-my_model.save('my_mnist_model') #saved under this folder
+class NeuralProcessing:
+    def __init__(self):
+        self.processor = CaseProcessing("total_deaths.txt")
+        self.look_back = 1
+        self.scaler = None
+        self.model = None
+
+    def load_model_and_scaler(self):
+        if self.model is None:
+            self.model = tf.keras.models.load_model('deaths_model')
+        if self.scaler is None:
+            self.scaler = joblib.load('scaler.gz')
+
+    def get_total_dict(self, days_passed):
+        startdate = "2020-01-03"
+        start_date = datetime.strptime(startdate, '%Y-%m-%d')
+        final_date = start_date + timedelta(days=days_passed)
+        year, month, day = final_date.year, final_date.month, final_date.day
+
+        #get the dictionary of country deaths
+        country_deaths = self.processor.get_country_deaths_dict(day, month, year)
+
+        #exclude unnecessary indices
+        country_deaths_cleaned = self.processor.exclude_indexes(country_deaths)
+
+        return country_deaths_cleaned
+
+    def get_total_list(self, days_passed):
+        startdate = "2020-01-03"
+        start_date = datetime.strptime(startdate, '%Y-%m-%d')
+        final_date = start_date + timedelta(days=days_passed)
+        year, month, day = final_date.year, final_date.month, final_date.day
+        death_list = self.processor.exclude_indexes(self.processor.get_country_deaths_dict(day, month, year), True)
+        death_list.insert(0, days_passed)
+        return death_list
+
+    def prepare_dataset(self, dataset):
+        X, Y = [], []
+        for i in range(len(dataset) - self.look_back):
+            X.append(dataset[i:(i + self.look_back)])
+            Y.append(dataset[i + self.look_back])
+        return np.array(X), np.array(Y)
+
+    def run_network(self):
+        total_days = 1360
+        dataset = [self.get_total_list(i) for i in range(total_days + 1)]
+        dataset = self.scaler.fit_transform(dataset)
+
+        X, Y = self.prepare_dataset(dataset)
+        X = X.reshape(X.shape[0], self.look_back, -1)
+
+        train_size = int(len(X) * 0.8)
+        X_train, X_validate = X[:train_size], X[train_size:]
+        Y_train, Y_validate = Y[:train_size], Y[train_size:]
+
+        """MODEL"""
+        my_model = tf.keras.models.Sequential()
+        my_model.add(tf.keras.layers.LSTM(128, return_sequences=True, input_shape=(self.look_back, len(self.get_total_list(1)))))
+        my_model.add(tf.keras.layers.Dropout(0.2))
+        my_model.add(tf.keras.layers.LSTM(64, return_sequences=True))
+        my_model.add(tf.keras.layers.Dropout(0.2))
+        my_model.add(tf.keras.layers.LSTM(32))
+        my_model.add(tf.keras.layers.Dense(len(self.get_total_list(1))))
+        my_model.compile(optimizer='adam', loss='mse')
+
+        """TRAINING"""
+        my_model.fit(X_train, Y_train, validation_data=(X_validate, Y_validate), epochs=30)
+
+        joblib.dump(self.scaler, 'scaler.gz')
+        self.predict_next(total_days)
+
+    def predict_next(self, total_days):
+        """PREDICTION"""
+        my_model = tf.keras.models.load_model('deaths_model')
+        self.scaler = joblib.load('scaler.gz')
+
+        #fetch the list of countries in the correct order from the actual next day data
+        actual_next_day_data = self.get_total_dict(total_days + 1)
+        countries = list(actual_next_day_data.keys())
+
+        #get the actual current day's data
+        current_day_data = self.get_total_dict(total_days)
+
+        #remove 'High income' key from the dictionaries
+        current_day_data.pop('High income', None)
+        actual_next_day_data.pop('High income', None)
+
+        current_day_data.pop('Democratic Republic of the Congo', None)
+        actual_next_day_data.pop('Democratic Republic of the Congo', None)
 
 
-my_new_model = tf.keras.models.load_model('my_mnist_model')
-#check for performance so it gives us the exact same result
-new_val_loss, new_val_acc = my_new_model.evaluate(test_images, test_labels)
-print("New testing accuracy: ", new_val_acc)
+        last_day_data = np.array([self.get_total_list(total_days)])
+
+        last_day_data = self.scaler.transform(last_day_data)
+        last_day_data = last_day_data.reshape(1, self.look_back, -1)
+        prediction_next_day = my_model.predict(last_day_data)
+        prediction_next_day = self.scaler.inverse_transform(prediction_next_day)
+
+        #extract the first row of predictions and ignore the first value (days_passed)
+        next_day_predictions = prediction_next_day[0][1:]  # Skip the first element (days_passed)
+
+        #replace negative values with zero and map to corresponding countries
+        predictions_dict = {country: max(0, int(pred)) for country, pred in zip(countries, next_day_predictions)}
+
+        #remove 'High income' key from the prediction dictionary
+        predictions_dict.pop('High income', None)
+        predictions_dict.pop('Democratic Republic of the Congo', None)
 
 
+        top_5_predicted_total_deaths = sorted(predictions_dict.items(), key=lambda x: x[1], reverse=True)[:50]
 
+        return top_5_predicted_total_deaths
 

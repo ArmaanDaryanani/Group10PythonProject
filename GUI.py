@@ -4,11 +4,6 @@
 * Last Updated 11/27/23
 """
 
-# Add sidebar that ranks list of countries that will have the most deaths the next day
-# Sidebar should be toggleable
-# optimization
-
-
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
@@ -18,8 +13,7 @@ from datetime import timedelta, datetime
 
 from dash.exceptions import PreventUpdate
 
-from NeuralProcessingTesting import NeuralProcessingTesting
-import tensorflow as tf
+from NeuralProcessing import NeuralProcessing
 
 import json
 import geopandas as gpd
@@ -39,8 +33,6 @@ def read_data_from_file(filename):
         file.close()
     return country_data
 
-
-
 filename = "countries.txt"
 country_data = read_data_from_file(filename)
 
@@ -52,7 +44,7 @@ gdf = gpd.read_file('countries.geojson')
 
 def initialize_color_country():
     country_dict = {}
-    # lookup landmass and add to dictionary (country_ISO3 : country_position (on landmass)
+    #lookup landmass and add to dictionary (country_ISO3 : country_position (on landmass)
     country_position = 0
     country_names = []
     country_ISO3_dict = {}
@@ -80,7 +72,7 @@ def latlong(country_name):
 def construct_data(deaths_filename):
     length_of_set = 0
     start_date_str = "2020-01-03"
-    end_date_str = "2020-05-09"
+    end_date_str = "2023-05-09"
 
     start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
     end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
@@ -90,7 +82,7 @@ def construct_data(deaths_filename):
     current_date = start_date
     data_dict = {}
 
-    prev_latlong_values = set()  # We'll store the previous date's values here
+    prev_latlong_values = set()
 
     while current_date <= end_date:
         year, month, day = current_date.year, current_date.month, current_date.day
@@ -101,7 +93,7 @@ def construct_data(deaths_filename):
 
         for country, deaths in country_deaths.items():
             if deaths > 0:
-                # Get the lat-long pair for the country
+                #get the lat-long pair for the country
                 lat_long_pair = latlong(country)
                 if lat_long_pair != (0, 0):
                     lat, long = lat_long_pair
@@ -109,18 +101,18 @@ def construct_data(deaths_filename):
 
         date_str = current_date.strftime('%Y-%m-%d')
 
-        # Find new points that weren't in the previous day's data
+        #find new points that weren't in the previous day's data
         new_points = latlong_values - prev_latlong_values
 
-        # If there are new points, update the data dictionary for the day
+        #if there are new points update the data dictionary for the day
         if new_points:
-            # Combine new points with previous points, placing new points at the top
+            #combine new points with previous points placing new points at the top
             combined_points = list(prev_latlong_values) + list(new_points)
             data_dict[date_str] = combined_points
 
         prev_latlong_values = latlong_values
 
-        # Move to the next date
+        #move to the next date
         current_date += timedelta(days=1)
 
     print(data_dict)
@@ -148,14 +140,14 @@ app.layout = html.Div([
     ),
     html.Div(id='globe-rotation', style={'display': 'none'}, children="{'lon': 0, 'lat': 0}"),
 
-    # Predict button and output on top left
+    #predict button and output on top left
     html.Div([
         html.Button('Predict', id='predict-button-top'),
         html.Div(id='prediction-output', style={'fontSize': '12.6px'})
     ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'flex-start', 'top': '0px', 'left': '10px',
               'position': 'absolute'}),
 
-    # Other controls at bottom
+    #other controls at bottom
     html.Div([
         dcc.Slider(
             id='date-slider',
@@ -163,17 +155,17 @@ app.layout = html.Div([
             max=len(data.keys()) - 1,
             value=0,
             step=None,
-            marks=None  # Optional: marks for each step
+            marks=None  #marks for each step
         ),
         html.Button('Play', id='play-button'),
         html.Button('Toggle Projection', id='toggle-projection-button'),
 
         dcc.Interval(
             id='interval-component',
-            interval=3 * 1000,  # in milliseconds where 1*1000 means every second
-            n_intervals=0,  # number of times the interval was activated
+            interval=3 * 1000,  #in milliseconds where 1*1000 means every second
+            n_intervals=0,  #number of times the interval was activated
             max_intervals=-1,  # -1 means no limit
-            disabled=True  # starts as disabled
+            disabled=True  #starts as disabled
         )
     ], style={'position': 'fixed', 'bottom': '2%', 'left': '2.5%', 'right': '2.5%'})
 ], style={'backgroundColor': 'white', 'position': 'relative'})
@@ -247,7 +239,7 @@ def update_map(date_index, toggle_clicks, current_fig):
 
     projection_type = "orthographic" if toggle_clicks % 2 != 0 else "mercator"
 
-    #This loop will process the coordinates and separate the deaths
+    #this loop will process the coordinates and separate the deaths
     for coord in coords:
         lat, long_deaths = coord
         len_deaths = int(str(long_deaths)[-1])
@@ -301,7 +293,7 @@ def update_map(date_index, toggle_clicks, current_fig):
     center = {'lat': 0, 'lon': 0}
 
 
-    # Layout of the map we are using
+    #layout of the map we are using
     layout = go.Layout(
         geo={
             'projection': {'type': projection_type},
@@ -344,21 +336,21 @@ def update_predictions(n_clicks, slider_value):
     if n_clicks is None:
         raise PreventUpdate
 
-    # Use the slider value to represent the days passed since the initial date
+    #use the slider value to represent the days passed since the initial date
     days_passed = slider_value
 
-    # Initialize the NeuralProcessingTesting instance and predict
-    neural_processor = NeuralProcessingTesting()
+    #initialize the NeuralProcessingTesting instance and predict
+    neural_processor = NeuralProcessing()
     top_5_predicted = neural_processor.predict_next(days_passed)
 
-    # Check if the result is not None and is iterable
+    #check if the result is not None and is iterable
     if top_5_predicted and isinstance(top_5_predicted, list):
-        # Create a list of Dash HTML components for displaying the predictions
+        #create a list of Dash HTML components for displaying the predictions
         predictions_list = [html.Li(f"{country}: {deaths}") for country, deaths in top_5_predicted]
     else:
         predictions_list = [html.Li("No predictions available")]
 
-    # Return the formatted list
+    #return the formatted list
     return html.Ol(predictions_list)
 
 
@@ -369,7 +361,7 @@ def update_predictions(n_clicks, slider_value):
     [State('interval-component', 'disabled')]
 )
 def toggle_play(n_clicks, currently_disabled):
-    if n_clicks is None:  # the button was never clicked
+    if n_clicks is None:  #the button was never clicked
         return True, "Play"
 
     if currently_disabled:
