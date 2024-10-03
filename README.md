@@ -1,5 +1,8 @@
 # Neural Epidemiological Model and GUI
 
+## **PLEASE REVIEW THE **IPYNB** FILE FOR MORE DETAILS!**
+
+## Description
 This project is a Python-based application that leverages neural networks, specifically through TensorFlow, to predict the global spread of viruses. It includes two main components: the frontend GUI and the backend neural processing.
 
 ## Team Members
@@ -48,3 +51,6 @@ python GUI.py
 
 ## Closing Notes
 This project demonstrates the power of neural networks in modeling epidemiological data. While there is room for further improvements, the project serves as a stepping stone for future teams to expand on.
+
+
+# PLEASE REVIEW THE **IPYNB** FILE FOR MORE DETAILS!
