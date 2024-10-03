@@ -6,7 +6,7 @@
 This project is a Python-based application that leverages neural networks, specifically through TensorFlow, to predict the global spread of viruses. It includes two main components: the frontend GUI and the backend neural processing.
 
 ## Team Members
-- **Scrum Master:** Armaan Daryanani (AU 2026)
+- **Scrum Master & Primary Developer:** Armaan Daryanani (AU 2026)
 - **Product Owner:** Taylor Bagwell (AU 2027)
 - **Developer 1:** Charlie Kemner (AU 2027)
 - **Developer 2:** Ian Mcgrady (AU 2027)
